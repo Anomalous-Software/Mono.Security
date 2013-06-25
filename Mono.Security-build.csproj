@@ -195,8 +195,8 @@
     <PreBuildEvent>
     </PreBuildEvent>
     <PostBuildEvent>
-      xcopy $(TargetName).* $(ProjectDir)..\lib\build\ /Y /R /D
-  </PostBuildEvent>
+      xcopy $(TargetName).* $(ProjectDir)..\lib\$(ConfigurationName)\ /Y /R /D
+</PostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
