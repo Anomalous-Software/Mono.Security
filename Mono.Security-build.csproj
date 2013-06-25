@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -18,6 +18,7 @@
     <AssemblyName>Mono.Security</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -42,10 +43,11 @@
   <PropertyGroup>
     <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
   </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>false</SignAssembly>
+  </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
-    <Compile Include="..\..\build\common\Consts.cs" />
-    <Compile Include="..\..\build\common\Locale.cs" />
     <Compile Include=".\Assembly\AssemblyInfo.cs" />
     <Compile Include=".\Mono.Math.Prime.Generator\NextPrimeFinder.cs" />
     <Compile Include=".\Mono.Math.Prime.Generator\PrimeGeneratorBase.cs" />
@@ -178,7 +180,10 @@
     <Compile Include=".\Mono.Security\PKCS7.cs" />
     <Compile Include=".\Mono.Security\StrongName.cs" />
     <Compile Include=".\Mono.Xml\MiniParser.cs" />
-    <Compile Include=".\Mono.Xml\SecurityParser.cs" />  </ItemGroup>
+    <Compile Include=".\Mono.Xml\SecurityParser.cs" />
+    <Compile Include="Consts.cs" />
+    <Compile Include="Locale.cs" />
+  </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
@@ -188,21 +193,14 @@
   -->
   <PropertyGroup>
     <PreBuildEvent>
-
     </PreBuildEvent>
     <PostBuildEvent>
       xcopy $(TargetName).* $(ProjectDir)..\lib\build\ /Y /R /D
   </PostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\corlib\corlib-build.csproj">
-      <Project>{B8B2866D-592F-4888-A1CB-697AD0F3CADE}</Project>
-      <Name>corlib\corlib-build</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\System\System-build-1.csproj">
-      <Project>{C3638457-A40E-4E70-81B4-54ACB31DD76D}</Project>
-      <Name>System\System-build-1</Name>
-    </ProjectReference>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
