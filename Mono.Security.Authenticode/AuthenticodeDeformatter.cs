@@ -166,6 +166,22 @@ namespace Mono.Security.Authenticode {
 			get { return signingCertificate; }
 		}
 
+        public X509Chain SignerChain
+        {
+            get
+            {
+                return signerChain;
+            }
+        }
+
+        public X509Chain TimestampChain
+        {
+            get
+            {
+                return timestampChain;
+            }
+        }
+
 		private bool CheckSignature (string fileName) 
 		{
 			filename = fileName;
