@@ -38,6 +38,8 @@ using Mono.Security.X509;
 
 namespace Mono.Security.Authenticode {
 
+    public delegate void SetupX509Chains(X509Chain signerChain, X509Chain timestampChain);
+
 	// References:
 	// a.	http://www.cs.auckland.ac.nz/~pgut001/pubs/authenticode.txt
 
@@ -47,6 +49,8 @@ namespace Mono.Security.Authenticode {
 	public 
 #endif
 	class AuthenticodeDeformatter : AuthenticodeBase {
+
+        public event SetupX509Chains SetupX509Chains;
 
 		private string filename;
 		private byte[] hash;
@@ -165,22 +169,6 @@ namespace Mono.Security.Authenticode {
 		public X509Certificate SigningCertificate {
 			get { return signingCertificate; }
 		}
-
-        public X509Chain SignerChain
-        {
-            get
-            {
-                return signerChain;
-            }
-        }
-
-        public X509Chain TimestampChain
-        {
-            get
-            {
-                return timestampChain;
-            }
-        }
 
 		private bool CheckSignature (string fileName) 
 		{
@@ -467,6 +455,10 @@ namespace Mono.Security.Authenticode {
 			signerChain.Reset ();
 			timestampChain.Reset ();
 			timestamp = DateTime.MinValue;
+            if (SetupX509Chains != null)
+            {
+                SetupX509Chains.Invoke(signerChain, timestampChain);
+            }
 		}
 	}
 }
