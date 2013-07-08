@@ -120,7 +120,12 @@ namespace Mono.Security.X509 {
 			return null;
 		}
 
-		public bool Build (X509Certificate leaf) 
+        public bool Build(X509Certificate leaf)
+        {
+            return Build(leaf, DateTime.Now);
+        }
+
+		public bool Build (X509Certificate leaf, DateTime instant) 
 		{
 			_status = X509ChainStatusFlags.NoError;
 			if (_chain == null) {
@@ -161,19 +166,21 @@ namespace Mono.Security.X509 {
 				foreach (X509Certificate x in _chain) {
 					// validate dates for each certificate in the chain
 					// note: we DO NOT check for nested date/time
-					if (!IsValid (x)) {
+					if (!IsValid (x, instant)) {
 						return false;
 					}
 				}
 				// check leaf
-				if (!IsValid (leaf)) {
+                if (!IsValid(leaf, instant))
+                {
 					// switch status code if the failure is expiration
 					if (_status == X509ChainStatusFlags.NotTimeNested)
 						_status = X509ChainStatusFlags.NotTimeValid;
 					return false;
 				}
 				// check root
-				if ((_root != null) && !IsValid (_root)) {
+                if ((_root != null) && !IsValid(_root, instant))
+                {
 					return false;
 				}
 			}
@@ -193,9 +200,9 @@ namespace Mono.Security.X509 {
 
 		// private stuff
 
-		private bool IsValid (X509Certificate cert) 
+		private bool IsValid (X509Certificate cert, DateTime instant) 
 		{
-			if (!cert.IsCurrent) {
+			if (!cert.WasCurrent(instant)) {
 				// FIXME: nesting isn't very well implemented
 				_status = X509ChainStatusFlags.NotTimeNested;
 				return false;
