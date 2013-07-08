@@ -308,45 +308,55 @@ namespace Mono.Security.Authenticode {
 			// we need to find the specified certificate
 			string issuer = sd.SignerInfo.IssuerName;
 			byte[] serial = sd.SignerInfo.SerialNumber;
-			foreach (X509Certificate x509 in coll) {
-				if (CompareIssuerSerial (issuer, serial, x509)) {
-					// don't verify is key size don't match
-					if (x509.PublicKey.Length > (signature.Length >> 3)) {
-						// return the signing certificate even if the signature isn't correct
-						// (required behaviour for 2.0 support)
-						signingCertificate = x509;
-						RSACryptoServiceProvider rsa = (RSACryptoServiceProvider) x509.RSA;
-						if (rsa.VerifyHash (p7hash, hashOID, signature)) {
-							signerChain.LoadCertificates (coll);
-							trustedRoot = signerChain.Build (x509);
-							break; 
-						}
-					}
-				}
-			}
 
-			// timestamp signature is optional
-			if (sd.SignerInfo.UnauthenticatedAttributes.Count == 0) {
-				trustedTimestampRoot = true;
-			}  else {
-				for (int i = 0; i < sd.SignerInfo.UnauthenticatedAttributes.Count; i++) {
-					ASN1 attr = (ASN1) sd.SignerInfo.UnauthenticatedAttributes[i];
-					string oid = ASN1Convert.ToOid (attr[0]);
-					switch (oid) {
-					case PKCS7.Oid.countersignature:
-						// SEQUENCE {
-						//   OBJECT IDENTIFIER
-						//     countersignature (1 2 840 113549 1 9 6)
-						//   SET {
-						PKCS7.SignerInfo cs = new PKCS7.SignerInfo (attr[1]);
-						trustedTimestampRoot = VerifyCounterSignature (cs, signature);
-						break;
-					default:
-						// we don't support other unauthenticated attributes
-						break;
-					}
-				}
-			}
+            // timestamp signature is optional
+            if (sd.SignerInfo.UnauthenticatedAttributes.Count == 0)
+            {
+                trustedTimestampRoot = true;
+            }
+            else
+            {
+                for (int i = 0; i < sd.SignerInfo.UnauthenticatedAttributes.Count; i++)
+                {
+                    ASN1 attr = (ASN1)sd.SignerInfo.UnauthenticatedAttributes[i];
+                    string oid = ASN1Convert.ToOid(attr[0]);
+                    switch (oid)
+                    {
+                        case PKCS7.Oid.countersignature:
+                            // SEQUENCE {
+                            //   OBJECT IDENTIFIER
+                            //     countersignature (1 2 840 113549 1 9 6)
+                            //   SET {
+                            PKCS7.SignerInfo cs = new PKCS7.SignerInfo(attr[1]);
+                            trustedTimestampRoot = VerifyCounterSignature(cs, signature);
+                            break;
+                        default:
+                            // we don't support other unauthenticated attributes
+                            break;
+                    }
+                }
+            }
+
+            foreach (X509Certificate x509 in coll)
+            {
+                if (CompareIssuerSerial(issuer, serial, x509))
+                {
+                    // don't verify is key size don't match
+                    if (x509.PublicKey.Length > (signature.Length >> 3))
+                    {
+                        // return the signing certificate even if the signature isn't correct
+                        // (required behaviour for 2.0 support)
+                        signingCertificate = x509;
+                        RSACryptoServiceProvider rsa = (RSACryptoServiceProvider)x509.RSA;
+                        if (rsa.VerifyHash(p7hash, hashOID, signature))
+                        {
+                            signerChain.LoadCertificates(coll);
+                            trustedRoot = signerChain.Build(x509, timestamp == DateTime.MinValue ? DateTime.UtcNow : timestamp);
+                            break;
+                        }
+                    }
+                }
+            }
 
 			return (trustedRoot && trustedTimestampRoot);
 		}
@@ -433,7 +443,7 @@ namespace Mono.Security.Authenticode {
 						rsam.ImportParameters (rsa.ExportParameters (false));
 						if (PKCS1.Verify_v15 (rsam, ha, p7hash, counterSignature, true)) {
 							timestampChain.LoadCertificates (coll);
-							return (timestampChain.Build (x509));
+							return (timestampChain.Build (x509, timestamp));
 						}
 					}
 				}
