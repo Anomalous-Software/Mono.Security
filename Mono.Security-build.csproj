@@ -181,6 +181,12 @@
     <Compile Include=".\Mono.Security\StrongName.cs" />
     <Compile Include=".\Mono.Xml\MiniParser.cs" />
     <Compile Include=".\Mono.Xml\SecurityParser.cs" />
+    <Compile Include="Anomalous.Security\CertificateAuthorityInfo.cs" />
+    <Compile Include="Anomalous.Security\CertificateStore.cs" />
+    <Compile Include="Anomalous.Security\CryptoHelper.cs" />
+    <Compile Include="Anomalous.Security\SignedDataFile.cs" />
+    <Compile Include="Anomalous.Security\SignedStream.cs" />
+    <Compile Include="Anomalous.Security\SigningException.cs" />
     <Compile Include="Consts.cs" />
     <Compile Include="Locale.cs" />
   </ItemGroup>
