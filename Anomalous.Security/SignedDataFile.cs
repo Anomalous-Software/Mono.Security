@@ -114,111 +114,92 @@ namespace Anomalous.Security
                 byte[] signature, counterSignature;
                 using (BinaryReader reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read)))
                 {
-                    if (hasSignature(reader))
+                    if (!hasSignature(reader))
                     {
-                        long footerStart = findFooterStart(reader);
-                        reader.BaseStream.Seek(footerStart, SeekOrigin.Begin);
-                        int ans1Length = (int)(reader.BaseStream.Length - FooterStartPosition - footerStart);
-                        ASN1 footerData = new ASN1(reader.ReadBytes(ans1Length));
+                        return TrustedResult.NotSigned;
+                    }
+                    long footerStart = findFooterStart(reader);
+                    reader.BaseStream.Seek(footerStart, SeekOrigin.Begin);
+                    int ans1Length = (int)(reader.BaseStream.Length - FooterStartPosition - footerStart);
+                    ASN1 footerData = new ASN1(reader.ReadBytes(ans1Length));
 
-                        ASN1 signatureData = footerData[0];
-                        signature = signatureData.Element(0, 0x13).Value;
-                        X509CertificateCollection signingCertificates = CryptoHelper.readCertificates(signatureData.Element(1, 0x30));
-                        Certificate = signingCertificates[0];
+                    ASN1 signatureData = footerData[0];
+                    signature = signatureData.Element(0, 0x13).Value;
+                    X509CertificateCollection signingCertificates = CryptoHelper.readCertificates(signatureData.Element(1, 0x30));
+                    Certificate = signingCertificates[0];
 
-                        ASN1 counterSignatureData = footerData[1];
-                        counterSignature = counterSignatureData.Element(0, 0x13).Value;
-                        Timestamp = ASN1Convert.ToDateTime(counterSignatureData[1]);
-                        X509CertificateCollection counterSignatureCertificates = CryptoHelper.readCertificates(counterSignatureData.Element(2, 0x30));
-                        CounterSignatureCertificate = counterSignatureCertificates[0];
+                    ASN1 counterSignatureData = footerData[1];
+                    counterSignature = counterSignatureData.Element(0, 0x13).Value;
+                    Timestamp = ASN1Convert.ToDateTime(counterSignatureData[1]);
+                    X509CertificateCollection counterSignatureCertificates = CryptoHelper.readCertificates(counterSignatureData.Element(2, 0x30));
+                    CounterSignatureCertificate = counterSignatureCertificates[0];
 
-                        if (Timestamp >= Certificate.ValidFrom && Timestamp <= Certificate.ValidUntil)
+                    if (Timestamp < Certificate.ValidFrom || Timestamp > Certificate.ValidUntil)
+                    {
+                        return TrustedResult.TimestampOutsideRange;
+                    }
+
+                    Chain = new X509Chain();
+                    Chain.LoadCertificates(signingCertificates);
+                    certificateStore.setupChain(Chain);
+                    if (!Chain.Build(Certificate, Timestamp))
+                    {
+                        return TrustedResult.InvalidChain;
+                    }
+
+                    X509Certificate signatureAuthorityCert = certificateStore.DataFileSignatureCAs.FindAuthorityCert(Chain);
+                    if (signatureAuthorityCert == null)
+                    {
+                        return TrustedResult.InvalidChainCA;
+                    }
+                        
+                    if (certificateStore.DataFileSignatureCAs.IsRevoked(Timestamp, Certificate, signatureAuthorityCert))
+                    {
+                        return TrustedResult.SignatureCertRevoked;
+                    }
+
+                    reader.BaseStream.Seek(0, SeekOrigin.Begin);
+                    byte[] hash;
+                    using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
+                    {
+                        using (Stream stream = new SignedStream(reader.BaseStream, footerStart))
                         {
-                            Chain = new X509Chain();
-                            Chain.LoadCertificates(signingCertificates);
-                            certificateStore.setupChain(Chain);
-                            if (Chain.Build(Certificate, Timestamp))
-                            {
-                                X509Certificate signatureAuthorityCert = certificateStore.DataFileSignatureCAs.FindAuthorityCert(Chain);
-                                if (signatureAuthorityCert != null)
-                                {
-                                    if (!certificateStore.DataFileSignatureCAs.IsRevoked(Timestamp, Certificate, signatureAuthorityCert))
-                                    {
-                                        reader.BaseStream.Seek(0, SeekOrigin.Begin);
-                                        byte[] hash;
-                                        using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
-                                        {
-                                            using (Stream stream = new SignedStream(reader.BaseStream, footerStart))
-                                            {
-                                                //Compute file hash
-                                                hash = hashAlgo.ComputeHash(stream);
-                                            }
-                                            if (Certificate.CheckSignature(hash, hashAlgoId, signature))
-                                            {
-                                                CounterSignatureChain = new X509Chain();
-                                                CounterSignatureChain.LoadCertificates(counterSignatureCertificates);
-                                                certificateStore.setupChain(CounterSignatureChain);
-                                                if (CounterSignatureChain.Build(CounterSignatureCertificate, Timestamp))
-                                                {
-                                                    X509Certificate counterSignatureAuthorityCert = certificateStore.DataFileCounterSignatureCAs.FindAuthorityCert(CounterSignatureChain);
-                                                    if (counterSignatureAuthorityCert != null)
-                                                    {
-                                                        if (!certificateStore.DataFileCounterSignatureCAs.IsRevoked(Timestamp, CounterSignatureCertificate, counterSignatureAuthorityCert))
-                                                        {
-                                                            byte[] counterHash = CryptoHelper.computeCounterHash(hashAlgo, hash, Timestamp.Ticks);
-                                                            if (CounterSignatureCertificate.CheckSignature(counterHash, hashAlgoId, counterSignature))
-                                                            {
-                                                                return TrustedResult.Valid;
-                                                            }
-                                                            else
-                                                            {
-                                                                return TrustedResult.InvalidCounterSignature;
-                                                            }
-                                                        }
-                                                        else
-                                                        {
-                                                            return TrustedResult.CounterSignatureCertRevoked;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        return TrustedResult.InvalidCounterSignatureChainCA;
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    return TrustedResult.InvalidCounterSignatureChain;
-                                                }
-                                            }
-                                            else
-                                            {
-                                                return TrustedResult.HashMismatch;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        return TrustedResult.SignatureCertRevoked;
-                                    }
-                                }
-                                else
-                                {
-                                    return TrustedResult.InvalidChainCA;
-                                }
-                            }
-                            else
-                            {
-                                return TrustedResult.InvalidChain;
-                            }
+                            //Compute file hash
+                            hash = hashAlgo.ComputeHash(stream);
+                        }
+                        if (!Certificate.CheckSignature(hash, hashAlgoId, signature))
+                        {
+                            return TrustedResult.HashMismatch;
+                        }
+
+                        CounterSignatureChain = new X509Chain();
+                        CounterSignatureChain.LoadCertificates(counterSignatureCertificates);
+                        certificateStore.setupChain(CounterSignatureChain);
+                        if (!CounterSignatureChain.Build(CounterSignatureCertificate, Timestamp))
+                        {
+                            return TrustedResult.InvalidCounterSignatureChain;
+                        }
+
+                        X509Certificate counterSignatureAuthorityCert = certificateStore.DataFileCounterSignatureCAs.FindAuthorityCert(CounterSignatureChain);
+                        if (counterSignatureAuthorityCert == null)
+                        {
+                            return TrustedResult.InvalidCounterSignatureChainCA;
+                        }
+
+                        if (certificateStore.DataFileCounterSignatureCAs.IsRevoked(Timestamp, CounterSignatureCertificate, counterSignatureAuthorityCert))
+                        {
+                            return TrustedResult.CounterSignatureCertRevoked;
+                        }
+
+                        byte[] counterHash = CryptoHelper.computeCounterHash(hashAlgo, hash, Timestamp.Ticks);
+                        if (CounterSignatureCertificate.CheckSignature(counterHash, hashAlgoId, counterSignature))
+                        {
+                            return TrustedResult.Valid;
                         }
                         else
                         {
-                            return TrustedResult.TimestampOutsideRange;
+                            return TrustedResult.InvalidCounterSignature;
                         }
-                    }
-                    else
-                    {
-                        return TrustedResult.NotSigned;
                     }
                 }
             }
