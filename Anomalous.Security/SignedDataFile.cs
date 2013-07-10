@@ -15,7 +15,7 @@ namespace Anomalous.Security
         public enum TrustedResult
         {
             Valid,
-            HashMismatch,
+            InvalidSignature,
             InvalidChain,
             InvalidChainCA,
             SignatureCertRevoked,
@@ -169,7 +169,7 @@ namespace Anomalous.Security
                         }
                         if (!Certificate.CheckSignature(hash, hashAlgoId, signature))
                         {
-                            return TrustedResult.HashMismatch;
+                            return TrustedResult.InvalidSignature;
                         }
 
                         CounterSignatureChain = new X509Chain();
