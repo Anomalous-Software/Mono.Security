@@ -29,6 +29,12 @@ namespace Anomalous.Security
             ValidDllCertificates = CryptoHelper.readCertificates(asn1.Element(2, 0x30));
             DataFileCounterSignatureCAs = new CertificateAuthorityInfo(asn1.Element(3, 0x30));
             DataFileSignatureCAs = new CertificateAuthorityInfo(asn1.Element(4, 0x30));
+            ASN1 serverCommunicationInfo = asn1[5];
+            if (serverCommunicationInfo.Length != 0)
+            {
+                ServerCommunicationCertificate = new X509Certificate(serverCommunicationInfo[0].GetBytes());
+                ServerCommunicationHashAlgo = Encoding.UTF8.GetString(serverCommunicationInfo[1].Value);
+            }
         }
 
         public DateTime IssueDate { get; set; }
@@ -40,6 +46,10 @@ namespace Anomalous.Security
         public CertificateAuthorityInfo DataFileCounterSignatureCAs { get; set; }
 
         public CertificateAuthorityInfo DataFileSignatureCAs { get; set; }
+
+        public X509Certificate ServerCommunicationCertificate { get; set; }
+
+        public String ServerCommunicationHashAlgo { get; set; }
 
         public void setupChain(X509Chain chain)
         {
@@ -55,6 +65,21 @@ namespace Anomalous.Security
             data.Add(CryptoHelper.writeCertificates(ValidDllCertificates));
             data.Add(DataFileCounterSignatureCAs.GetData());
             data.Add(DataFileSignatureCAs.GetData());
+            if (ServerCommunicationCertificate != null)
+            {
+                if (ServerCommunicationHashAlgo == null)
+                {
+                    throw new Exception("Must specify a hash algorithm for the server communications if a cert is specified.");
+                }
+                ASN1 serverCommunicationInfo = new ASN1(0x30);
+                serverCommunicationInfo.Add(new ASN1(ServerCommunicationCertificate.RawData));
+                serverCommunicationInfo.Add(new ASN1(0x13, Encoding.UTF8.GetBytes(ServerCommunicationHashAlgo)));
+                data.Add(serverCommunicationInfo);
+            }
+            else
+            {
+                data.Add(new ASN1(0x30));
+            }
             
             return data;
         }
