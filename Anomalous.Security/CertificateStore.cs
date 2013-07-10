@@ -102,32 +102,35 @@ namespace Anomalous.Security
                 lastCert = new X509Certificate(certificates[i].GetBytes());
                 chain.LoadCertificate(lastCert);
             }
-            if (chain.Build(lastCert))
-            {
-                if (!CryptoHelper.Compare(trustedSignature.SerialNumber, lastCert.SerialNumber))
-                {
-                    throw new SigningException("Store not signed by trusted signature.");
-                }
-
-                ASN1 data = asn1.Element(0, 0x30);
-                using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
-                {
-                    byte[] hash = hashAlgo.ComputeHash(data.Value);
-                    byte[] signature = signatureData.Element(0, 0x13).Value;
-
-                    if (lastCert.CheckSignature(hash, hashAlgoId, signature))
-                    {
-                        return new CertificateStore(data);
-                    }
-                    else
-                    {
-                        throw new SigningException("Invalid Signature.");
-                    }
-                }
-            }
-            else
+            if (!chain.Build(lastCert))
             {
                 throw new SigningException(String.Format("Invalid Chain. Reason '{0}'.", chain.Status));
+            }
+
+            if (!CryptoHelper.Compare(trustedSignature.SerialNumber, lastCert.SerialNumber))
+            {
+                throw new SigningException("Certificate Store not signed by trusted signature.");
+            }
+
+            if (!lastCert.IsCurrent)
+            {
+                throw new SigningException("The Certificate Store has expired");
+            }
+
+            ASN1 data = asn1.Element(0, 0x30);
+            using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
+            {
+                byte[] hash = hashAlgo.ComputeHash(data.Value);
+                byte[] signature = signatureData.Element(0, 0x13).Value;
+
+                if (lastCert.CheckSignature(hash, hashAlgoId, signature))
+                {
+                    return new CertificateStore(data);
+                }
+                else
+                {
+                    throw new SigningException("Invalid Signature.");
+                }
             }
         }
     }
