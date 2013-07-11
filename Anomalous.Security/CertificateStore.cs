@@ -137,10 +137,7 @@ namespace Anomalous.Security
                 throw new SigningException("Certificate Store not signed by trusted signature.");
             }
 
-            if (!lastCert.IsCurrent)
-            {
-                throw new SigningException("The Certificate Store has expired");
-            }
+            //We purposefully do not care if the certificate store's certificate has expired. This will ensure that the program keeps working as long as it has a valid store.
 
             ASN1 data = asn1.Element(0, 0x30);
             using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
