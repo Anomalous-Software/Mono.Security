@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Anomalous.Security
 {
-    class SigningException : Exception
+    public class SigningException : Exception
     {
         public SigningException(String message)
             :base(message)
