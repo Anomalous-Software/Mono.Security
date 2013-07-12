@@ -30,7 +30,7 @@ namespace Anomalous.Security
             DataFileCounterSignatureCAs = new CertificateAuthorityInfo(asn1.Element(3, 0x30));
             DataFileSignatureCAs = new CertificateAuthorityInfo(asn1.Element(4, 0x30));
             ASN1 serverCommunicationInfo = asn1[5];
-            if (serverCommunicationInfo.Length != 0)
+            if (serverCommunicationInfo.Tag != 0x05)
             {
                 ServerCommunicationCertificate = new X509Certificate(serverCommunicationInfo[0].GetBytes());
                 ServerCommunicationHashAlgo = Encoding.UTF8.GetString(serverCommunicationInfo[1].Value);
@@ -78,7 +78,7 @@ namespace Anomalous.Security
             }
             else
             {
-                data.Add(new ASN1(0x30));
+                data.Add(new ASN1(0x05));
             }
             
             return data;
