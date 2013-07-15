@@ -40,7 +40,7 @@ using System.Runtime.InteropServices;
 
 // General Information about the system assembly
 
-[assembly: AssemblyVersion (Consts.FxVersion)]
+[assembly: AssemblyVersion("1.0.0.0")]
 
 [assembly: AssemblyCompany ("MONO development team")]
 [assembly: AssemblyCopyright ("(c) 2003-2004 Various Authors")]
