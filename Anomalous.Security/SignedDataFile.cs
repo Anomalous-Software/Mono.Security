@@ -36,29 +36,45 @@ namespace Anomalous.Security
         private const String hashAlgoName = "SHA256";
         private static readonly String hashAlgoId = CryptoConfig.MapNameToOID(hashAlgoName);
 
-        public static void SignDataFile(String file, String outFile, PKCS12 signingCert, PKCS12 timestampCert)
+        public static void SignDataFile(String file, String outFile, PKCS12 signingCert, PKCS12 counterSignatureCert)
         {
-            using (BinaryReader br = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read)))
+            using (Stream sourceStream = File.Open(file, FileMode.Open, FileAccess.Read))
+            {
+                using (Stream destStream = File.Open(outFile, FileMode.Create, FileAccess.Write))
+                {
+                    SignDataFile(sourceStream, destStream, signingCert, counterSignatureCert);
+                }
+            }
+        }
+
+        public static void SignDataFile(Stream source, Stream destination, PKCS12 signingCert, PKCS12 counterSignatureCert)
+        {
+            RSACryptoServiceProvider signingPrivateKey = CryptoHelper.findPrivateKey(signingCert);
+            RSACryptoServiceProvider counterPrivateKey = CryptoHelper.findPrivateKey(counterSignatureCert);
+            SignDataFile(source, destination, signingPrivateKey, signingCert.Certificates, counterPrivateKey, counterSignatureCert.Certificates);
+        }
+
+        public static void SignDataFile(Stream source, Stream destination, RSACryptoServiceProvider signingPrivateKey, X509CertificateCollection signingCerts, RSACryptoServiceProvider counterPrivateKey, X509CertificateCollection counterSigningCerts)
+        {
+            using (BinaryReader br = new BinaryReader(source))
             {
                 if (hasSignature(br))
                 {
                     long footerStart = findFooterStart(br);
                     br.BaseStream.Seek(0, SeekOrigin.Begin);
                     Stream signedStream = new SignedStream(br.BaseStream, footerStart);
-                    createSignature(outFile, signedStream, signingCert, timestampCert);
+                    createSignature(destination, signedStream, signingPrivateKey, signingCerts, counterPrivateKey, counterSigningCerts);
                 }
                 else
                 {
                     br.BaseStream.Seek(0, SeekOrigin.Begin);
-                    createSignature(outFile, br.BaseStream, signingCert, timestampCert);
+                    createSignature(destination, br.BaseStream, signingPrivateKey, signingCerts, counterPrivateKey, counterSigningCerts);
                 }
             }
         }
 
-        private static void createSignature(String outFile, Stream stream, PKCS12 signingCert, PKCS12 counterSigningCert)
+        private static void createSignature(Stream destinationStream, Stream stream, RSACryptoServiceProvider signingPrivateKey, X509CertificateCollection signingCerts, RSACryptoServiceProvider counterPrivateKey, X509CertificateCollection counterSigningCerts)
         {
-            RSACryptoServiceProvider signingPrivateKey = CryptoHelper.findPrivateKey(signingCert);
-            RSACryptoServiceProvider counterPrivateKey = CryptoHelper.findPrivateKey(counterSigningCert);
             //Convert to / from asn1 so that the timestamp we hash with matches what will
             //be decoded when we check the signature, by default there are extra ticks likley
             //for sub seconds.
@@ -76,19 +92,19 @@ namespace Anomalous.Security
             }
 
             stream.Seek(0, SeekOrigin.Begin);
-            using (BinaryWriter outStream = new BinaryWriter(File.Open(outFile, FileMode.Create, FileAccess.Write)))
+            using (BinaryWriter outStream = new BinaryWriter(destinationStream))
             {
                 stream.CopyTo(outStream.BaseStream);
                 long footerStart = stream.Position;
 
                 ASN1 signatureData = new ASN1(0x30);
                 signatureData.Add(new ASN1(0x13, signature)); //Signature, bit string
-                signatureData.Add(CryptoHelper.writeCertificates(signingCert.Certificates));
+                signatureData.Add(CryptoHelper.writeCertificates(signingCerts));
 
                 ASN1 counterSignatureData = new ASN1(0x30);
                 counterSignatureData.Add(new ASN1(0x13, counterSignature)); //Counter signature, bit string
                 counterSignatureData.Add(timestampAsn1); //Timestamp
-                counterSignatureData.Add(CryptoHelper.writeCertificates(counterSigningCert.Certificates));
+                counterSignatureData.Add(CryptoHelper.writeCertificates(counterSigningCerts));
 
                 ASN1 footerData = new ASN1(0x30);
                 footerData.Add(signatureData);
