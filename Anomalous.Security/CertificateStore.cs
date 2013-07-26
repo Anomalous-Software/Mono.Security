@@ -51,11 +51,6 @@ namespace Anomalous.Security
 
         public String ServerCommunicationHashAlgo { get; set; }
 
-        public void setupChain(X509Chain chain)
-        {
-            chain.TrustAnchors.AddRange(TrustAnchors);
-        }
-
         public ASN1 asASN1()
         {
             ASN1 data = new ASN1(0x30);

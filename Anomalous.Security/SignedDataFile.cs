@@ -51,10 +51,10 @@ namespace Anomalous.Security
         {
             RSACryptoServiceProvider signingPrivateKey = CryptoHelper.findPrivateKey(signingCert);
             RSACryptoServiceProvider counterPrivateKey = CryptoHelper.findPrivateKey(counterSignatureCert);
-            SignDataFile(source, destination, signingPrivateKey, CryptoHelper.getCertBytesFromCollection(signingCert.Certificates), counterPrivateKey, CryptoHelper.getCertBytesFromCollection(counterSignatureCert.Certificates));
+            SignDataFile(source, destination, signingPrivateKey, signingCert.Certificates[0].RawData, counterPrivateKey, counterSignatureCert.Certificates[0].RawData);
         }
 
-        public static void SignDataFile(Stream source, Stream destination, RSACryptoServiceProvider signingPrivateKey, IEnumerable<byte[]> signingCerts, RSACryptoServiceProvider counterPrivateKey, IEnumerable<byte[]> counterSigningCerts)
+        public static void SignDataFile(Stream source, Stream destination, RSACryptoServiceProvider signingPrivateKey, byte[] signingCertBytes, RSACryptoServiceProvider counterPrivateKey, byte[] counterSigningCertBytes)
         {
             using (BinaryReader br = new BinaryReader(source))
             {
@@ -63,17 +63,17 @@ namespace Anomalous.Security
                     long footerStart = findFooterStart(br);
                     br.BaseStream.Seek(0, SeekOrigin.Begin);
                     Stream signedStream = new SignedStream(br.BaseStream, footerStart);
-                    createSignature(destination, signedStream, signingPrivateKey, signingCerts, counterPrivateKey, counterSigningCerts);
+                    createSignature(destination, signedStream, signingPrivateKey, signingCertBytes, counterPrivateKey, counterSigningCertBytes);
                 }
                 else
                 {
                     br.BaseStream.Seek(0, SeekOrigin.Begin);
-                    createSignature(destination, br.BaseStream, signingPrivateKey, signingCerts, counterPrivateKey, counterSigningCerts);
+                    createSignature(destination, br.BaseStream, signingPrivateKey, signingCertBytes, counterPrivateKey, counterSigningCertBytes);
                 }
             }
         }
 
-        private static void createSignature(Stream destinationStream, Stream stream, RSACryptoServiceProvider signingPrivateKey, IEnumerable<byte[]> signingCerts, RSACryptoServiceProvider counterPrivateKey, IEnumerable<byte[]> counterSigningCerts)
+        private static void createSignature(Stream destinationStream, Stream stream, RSACryptoServiceProvider signingPrivateKey, byte[] signingCertBytes, RSACryptoServiceProvider counterPrivateKey, byte[] counterSigningCertBytes)
         {
             //Convert to / from asn1 so that the timestamp we hash with matches what will
             //be decoded when we check the signature, by default there are extra ticks likley
@@ -99,12 +99,12 @@ namespace Anomalous.Security
 
                 ASN1 signatureData = new ASN1(0x30);
                 signatureData.Add(new ASN1(0x13, signature)); //Signature, bit string
-                signatureData.Add(CryptoHelper.writeCertificatesFromBytes(signingCerts));
+                signatureData.Add(new ASN1(signingCertBytes));
 
                 ASN1 counterSignatureData = new ASN1(0x30);
                 counterSignatureData.Add(new ASN1(0x13, counterSignature)); //Counter signature, bit string
                 counterSignatureData.Add(timestampAsn1); //Timestamp
-                counterSignatureData.Add(CryptoHelper.writeCertificatesFromBytes(counterSigningCerts));
+                counterSignatureData.Add(new ASN1(counterSigningCertBytes));
 
                 ASN1 footerData = new ASN1(0x30);
                 footerData.Add(signatureData);
@@ -141,14 +141,12 @@ namespace Anomalous.Security
 
                     ASN1 signatureData = footerData[0];
                     signature = signatureData.Element(0, 0x13).Value;
-                    X509CertificateCollection signingCertificates = CryptoHelper.readCertificates(signatureData.Element(1, 0x30));
-                    Certificate = signingCertificates[0];
+                    Certificate = new X509Certificate(signatureData[1].GetBytes());
 
                     ASN1 counterSignatureData = footerData[1];
                     counterSignature = counterSignatureData.Element(0, 0x13).Value;
                     Timestamp = ASN1Convert.ToDateTime(counterSignatureData[1]);
-                    X509CertificateCollection counterSignatureCertificates = CryptoHelper.readCertificates(counterSignatureData.Element(2, 0x30));
-                    CounterSignatureCertificate = counterSignatureCertificates[0];
+                    CounterSignatureCertificate = new X509Certificate(counterSignatureData[2].GetBytes());
 
                     if (Timestamp < Certificate.ValidFrom || Timestamp > Certificate.ValidUntil)
                     {
@@ -156,8 +154,10 @@ namespace Anomalous.Security
                     }
 
                     Chain = new X509Chain();
-                    Chain.LoadCertificates(signingCertificates);
-                    certificateStore.setupChain(Chain);
+                    Chain.LoadCertificate(Certificate);
+                    Chain.LoadCertificates(certificateStore.DataFileSignatureCAs.Certificates);
+                    Chain.LoadCertificates(certificateStore.TrustAnchors);
+                    Chain.TrustAnchors.AddRange(certificateStore.TrustAnchors);
                     if (!Chain.Build(Certificate, Timestamp))
                     {
                         return TrustedResult.InvalidChain;
@@ -189,8 +189,10 @@ namespace Anomalous.Security
                         }
 
                         CounterSignatureChain = new X509Chain();
-                        CounterSignatureChain.LoadCertificates(counterSignatureCertificates);
-                        certificateStore.setupChain(CounterSignatureChain);
+                        CounterSignatureChain.LoadCertificate(CounterSignatureCertificate);
+                        CounterSignatureChain.LoadCertificates(certificateStore.DataFileCounterSignatureCAs.Certificates);
+                        CounterSignatureChain.LoadCertificates(certificateStore.TrustAnchors);
+                        CounterSignatureChain.TrustAnchors.AddRange(certificateStore.TrustAnchors);
                         if (!CounterSignatureChain.Build(CounterSignatureCertificate, Timestamp))
                         {
                             return TrustedResult.InvalidCounterSignatureChain;
