@@ -51,10 +51,10 @@ namespace Anomalous.Security
         {
             RSACryptoServiceProvider signingPrivateKey = CryptoHelper.findPrivateKey(signingCert);
             RSACryptoServiceProvider counterPrivateKey = CryptoHelper.findPrivateKey(counterSignatureCert);
-            SignDataFile(source, destination, signingPrivateKey, signingCert.Certificates, counterPrivateKey, counterSignatureCert.Certificates);
+            SignDataFile(source, destination, signingPrivateKey, CryptoHelper.getCertBytesFromCollection(signingCert.Certificates), counterPrivateKey, CryptoHelper.getCertBytesFromCollection(counterSignatureCert.Certificates));
         }
 
-        public static void SignDataFile(Stream source, Stream destination, RSACryptoServiceProvider signingPrivateKey, X509CertificateCollection signingCerts, RSACryptoServiceProvider counterPrivateKey, X509CertificateCollection counterSigningCerts)
+        public static void SignDataFile(Stream source, Stream destination, RSACryptoServiceProvider signingPrivateKey, IEnumerable<byte[]> signingCerts, RSACryptoServiceProvider counterPrivateKey, IEnumerable<byte[]> counterSigningCerts)
         {
             using (BinaryReader br = new BinaryReader(source))
             {
@@ -73,7 +73,7 @@ namespace Anomalous.Security
             }
         }
 
-        private static void createSignature(Stream destinationStream, Stream stream, RSACryptoServiceProvider signingPrivateKey, X509CertificateCollection signingCerts, RSACryptoServiceProvider counterPrivateKey, X509CertificateCollection counterSigningCerts)
+        private static void createSignature(Stream destinationStream, Stream stream, RSACryptoServiceProvider signingPrivateKey, IEnumerable<byte[]> signingCerts, RSACryptoServiceProvider counterPrivateKey, IEnumerable<byte[]> counterSigningCerts)
         {
             //Convert to / from asn1 so that the timestamp we hash with matches what will
             //be decoded when we check the signature, by default there are extra ticks likley
@@ -99,12 +99,12 @@ namespace Anomalous.Security
 
                 ASN1 signatureData = new ASN1(0x30);
                 signatureData.Add(new ASN1(0x13, signature)); //Signature, bit string
-                signatureData.Add(CryptoHelper.writeCertificates(signingCerts));
+                signatureData.Add(CryptoHelper.writeCertificatesFromBytes(signingCerts));
 
                 ASN1 counterSignatureData = new ASN1(0x30);
                 counterSignatureData.Add(new ASN1(0x13, counterSignature)); //Counter signature, bit string
                 counterSignatureData.Add(timestampAsn1); //Timestamp
-                counterSignatureData.Add(CryptoHelper.writeCertificates(counterSigningCerts));
+                counterSignatureData.Add(CryptoHelper.writeCertificatesFromBytes(counterSigningCerts));
 
                 ASN1 footerData = new ASN1(0x30);
                 footerData.Add(signatureData);
