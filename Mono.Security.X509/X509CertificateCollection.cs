@@ -30,6 +30,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace Mono.Security.X509 {
 
@@ -89,6 +90,15 @@ namespace Mono.Security.X509 {
 			for (int i = 0; i < value.InnerList.Count; i++) 
 				InnerList.Add (value [i]);
 		}
+
+        public void AddRange(IEnumerable<X509Certificate> value)
+        {
+            if (value == null)
+                throw new ArgumentNullException("value");
+
+            foreach (X509Certificate cert in value)
+                InnerList.Add(cert);
+        }
 		
 		public bool Contains (X509Certificate value) 
 		{

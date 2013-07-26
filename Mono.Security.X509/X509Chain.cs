@@ -40,6 +40,7 @@ using System.Net;
 #endif
 
 using Mono.Security.X509.Extensions;
+using System.Collections.Generic;
 
 namespace Mono.Security.X509 {
 
@@ -110,6 +111,11 @@ namespace Mono.Security.X509 {
 		{
 			certs.AddRange (collection);
 		}
+
+        public void LoadCertificates(IEnumerable<X509Certificate> collection)
+        {
+            certs.AddRange(collection);
+        }
 
 		public X509Certificate FindByIssuerName (string issuerName) 
 		{
