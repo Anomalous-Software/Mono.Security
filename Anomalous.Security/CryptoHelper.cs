@@ -72,6 +72,24 @@ namespace Anomalous.Security
             return asn1;
         }
 
+        public static ASN1 writeCertificatesFromBytes(IEnumerable<byte[]> certificates)
+        {
+            ASN1 asn1 = new ASN1(0x30); //Certificate sequence
+            foreach (var cert in certificates) //All certificates for this file
+            {
+                asn1.Add(new ASN1(cert));
+            }
+            return asn1;
+        }
+
+        public static IEnumerable<byte[]> getCertBytesFromCollection(X509CertificateCollection collection)
+        {
+            foreach (var cert in collection)
+            {
+                yield return cert.RawData;
+            }
+        }
+
         public static X509CertificateCollection readCertificates(ASN1 certificates)
         {
             X509CertificateCollection collection = new X509CertificateCollection();

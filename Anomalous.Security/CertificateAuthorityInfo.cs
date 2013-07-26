@@ -81,5 +81,13 @@ namespace Anomalous.Security
             }
             return data;
         }
+
+        public IEnumerable<X509Certificate> Certificates
+        {
+            get
+            {
+                return certificates.Keys;
+            }
+        }
     }
 }
