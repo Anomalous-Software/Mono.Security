@@ -128,7 +128,7 @@ namespace Anomalous.Security
             try
             {
                 byte[] signature, counterSignature;
-                using (BinaryReader reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read)))
+                using (BinaryReader reader = new BinaryReader(File.OpenRead(file)))
                 {
                     if (!hasSignature(reader))
                     {
