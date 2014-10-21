@@ -85,10 +85,25 @@ namespace Anomalous.Security
             using (HashAlgorithm hashAlgo = HashAlgorithm.Create(hashAlgoName))
             {
                 //Compute file hash
-                hash = hashAlgo.ComputeHash(stream);
-                signature = signingPrivateKey.SignHash(hash, hashAlgoId);
-                counterHash = CryptoHelper.computeCounterHash(hashAlgo, hash, timestamp.Ticks);
-                counterSignature = counterPrivateKey.SignHash(counterHash, hashAlgoId);
+                try
+                {
+                    hash = hashAlgo.ComputeHash(stream);
+                    signature = signingPrivateKey.SignHash(hash, hashAlgoId);
+                }
+                catch(CryptographicException ex)
+                {
+                    throw new SigningException(String.Format("Signature threw CryptographicException. Inner Message: {0}", ex.Message));
+                }
+
+                try
+                {
+                    counterHash = CryptoHelper.computeCounterHash(hashAlgo, hash, timestamp.Ticks);
+                    counterSignature = counterPrivateKey.SignHash(counterHash, hashAlgoId);
+                }
+                catch (CryptographicException ex)
+                {
+                    throw new SigningException(String.Format("Counter Signature threw CryptographicException. Inner Message: {0}", ex.Message));
+                }
             }
 
             stream.Seek(0, SeekOrigin.Begin);
